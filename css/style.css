@@ -1,0 +1,113 @@
+/* ==========================================================================
+   Projet Réseau - Feuille de style principale
+   ========================================================================== */
+
+* { box-sizing: border-box; }
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0; padding: 0;
+    background-color: #f4f7f6; color: #333;
+}
+
+/* Logos et Connexion */
+#login-section {
+    width: 100%; max-width: 400px;
+    margin: 100px auto; padding: 30px;
+    background: white; border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center;
+}
+#login-section h1 { color: #2c3e50; margin-bottom: 5px; }
+#login-section p { font-size: 0.9em; color: #7f8c8d; margin-bottom: 25px; }
+.login-logos { display: flex; justify-content: space-around; align-items: center; margin-bottom: 20px; }
+.logo-ecole, .logo-univ { height: 75px; width: auto; object-fit: contain; }
+
+/* En-tête (Header) */
+header {
+    background-color: #2c3e50; color: white;
+    padding: 15px 25px;
+    display: flex; justify-content: space-between; align-items: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+.header-left { display: flex; align-items: center; }
+.mini-logo { height: 45px; width: auto; margin-right: 15px; object-fit: contain; background-color: rgba(255, 255, 255, 0.9); padding: 5px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+header span { margin-left: 10px; font-size: 0.9em; }
+
+/* Mise en page globale (La page remplit 100% de l'écran en Flexbox) */
+body, html { height: 100%; overflow: hidden; }
+#global-container { display: flex; flex-direction: column; height: 100vh; }
+header, .top-toolbars { flex-shrink: 0; z-index: 10; position: relative; }
+main {
+    flex-grow: 1; display: flex; overflow: hidden; height: auto; background: #fff;
+}
+
+/* Espace de travail de la topologie réseau */
+#mynetwork {
+    flex-grow: 1;
+    background-color: #ffffff;
+    border-right: 2px solid #ddd;
+    background-image: radial-gradient(#e5e5e5 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+/* Menus d'administration (En haut) */
+.top-toolbars { background: #fff; border-bottom: 1px solid #ddd; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+.main-toolbar { display: flex; padding: 12px 20px; gap: 12px; background: #ecf0f1; border-bottom: 1px solid #bdc3c7; }
+.tb-btn { width: auto; padding: 8px 15px; background: white; color: #2c3e50; border: 1px solid #bdc3c7; font-weight: bold; border-radius: 5px; font-size: 0.95em; }
+.tb-btn:hover { background: #e2e8ed; }
+.tb-btn.btn-danger { color: #e74c3c; border-color: #e74c3c; }
+.tb-btn.btn-danger:hover { background: #fadbd8; color: #c0392b; }
+
+.sub-toolbar { padding: 15px 25px; background: #fcfcfc; border-bottom: 2px solid #3498db; box-shadow: inset 0 3px 5px rgba(0,0,0,0.04); transition: all 0.3s; }
+.sub-toolbar.hidden { display: none; }
+.inline-form { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+.inline-form label { font-weight: bold; font-size: 0.9em; margin: 0; color: #2c3e50; }
+.inline-form button { width: auto; padding: 8px 20px; margin-left: auto; }
+
+/* Regroupement de tous les champs de saisie */
+input[type="text"], input[type="number"], input[type="password"], select { width: auto; margin: 0; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; }
+
+/* Boutons standards */
+button { width: 100%; padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: background 0.3s; background-color: #3498db; color: white; }
+button:hover { background-color: #2980b9; }
+.btn-danger { background-color: #e74c3c; width: auto; padding: 8px 15px; }
+.btn-danger:hover { background-color: #c0392b; }
+
+/* Console d'affichage de la simulation IP (À droite) */
+#console-panel { width: 420px; display: flex; flex-direction: column; background: #1e272e; color: #ecf0f1; border-left: 2px solid #111; z-index: 5; }
+.console-header { padding: 20px; background: #2c3e50; border-bottom: 3px solid #34495e; box-shadow: 0 4px 6px rgba(0,0,0,0.3); z-index: 2; }
+.console-header h3 { margin: 0 0 15px 0; color: #4bcffa; font-size: 1.2em; }
+.console-results { flex-grow: 1; padding: 20px; overflow-y: auto; font-family: 'Consolas', 'Courier New', monospace; }
+.console-results ul { list-style: none; padding: 0; margin: 0; }
+
+/* Étapes cachées par défaut (affichées par JS progressivement) */
+.sim-step-item { display: none; margin-bottom: 12px; padding: 12px; background: #2f3640; border-left: 4px solid #4bcffa; border-radius: 4px; font-size: 0.85em; color: #dcdde1; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+.sim-step-item.erreur { border-left-color: #e84118; color: #e84118; background: #3c1f1f; }
+.sim-step-item.active-step { background: #00456b; border-left-width: 6px; box-shadow: 0 0 12px rgba(75, 207, 250, 0.4); border-left-color: #00a8ff; color: #f5f6fa; }
+.sim-step-item strong { color: #4bcffa; font-size: 1.1em; }
+.sim-step-item em { color: #718093; }
+
+/* Petite fenêtre Pop-up des équipements (AJAX) */
+#node-details-panel {
+    position: absolute;
+    bottom: 20px;
+    right: 440px;
+    background: white;
+    border-top: 5px solid #3498db;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    z-index: 1000;
+    width: 360px;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+#node-details-panel.hidden { display: none; }
+.panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; margin-bottom: 10px; padding-bottom: 5px; }
+.panel-header h3 { margin: 0; color: #2980b9; font-size: 1.1em; }
+#nd-content h4 { margin: 15px 0 5px 0; font-size: 0.9em; color: #34495e; border-bottom: 1px dotted #ccc; display: inline-block;}
+#nd-content p { margin: 5px 0; font-size: 0.9em; }
+.info-table { width: 100%; border-collapse: collapse; font-size: 0.85em; margin-bottom: 5px; }
+.info-table th, .info-table td { padding: 6px; border: 1px solid #ddd; text-align: left; }
+.info-table th { background-color: #f9f9f9; font-weight: bold; }
+.info-table tr:nth-child(even) { background-color: #fcfcfc; }
