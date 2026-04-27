@@ -536,7 +536,7 @@ if (isset($_POST['action'])) {
                     'id' => 'net_' . $row['idreseau'],
                     'label' => $row['adressereseau'] . '/' . $row['masquecidr'],
                     'shape' => 'image',
-                    'image' => 'images/reseau.png',
+                    'image' => 'images/reseauv2.png',
                     'size' => 70,
                     'font' => ['size' => 13, 'color' => '#000000', 'vadjust' => -80, 'strokeWidth' => 0, 'bold' => true],
                     'x' => rand(-200, 200),
