@@ -477,27 +477,36 @@ if (isset($_POST['action'])) {
             $idElement = (int)$_POST['idElement'];
             $idU = (int)$_SESSION['idUtilisateur'];
             
-            // On vérifie que l'utilisateur a bien le droit de supprimer l'élément (Sécurité)
+            // On gère la suppression en cascade manuellement pour respecter les clés étrangères de la BDD
             switch ($typeElement) {
                 case 'equipement':
-                    $sql = "DELETE FROM equipement WHERE idequipement = $idElement AND idutilisateur = $idU";
+                    // On vérifie que l'équipement appartient bien à l'utilisateur
+                    $check = pg_exec($connect, "SELECT 1 FROM equipement WHERE idequipement = $idElement AND idutilisateur = $idU");
+                    if (pg_num_rows($check) > 0) {
+                        // On nettoie d'abord les dépendances (Routes puis Interfaces)
+                        pg_exec($connect, "DELETE FROM route_statique WHERE idequipement = $idElement");
+                        pg_exec($connect, "DELETE FROM interface WHERE idequipement = $idElement");
+                        // Puis on supprime l'équipement sereinement
+                        pg_exec($connect, "DELETE FROM equipement WHERE idequipement = $idElement");
+                    }
                     break;
                 case 'reseau':
-                    $sql = "DELETE FROM reseau WHERE idreseau = $idElement AND idutilisateur = $idU";
+                    $check = pg_exec($connect, "SELECT 1 FROM reseau WHERE idreseau = $idElement AND idutilisateur = $idU");
+                    if (pg_num_rows($check) > 0) {
+                        // On débranche les interfaces associées à ce réseau
+                        pg_exec($connect, "DELETE FROM interface WHERE idreseau = $idElement");
+                        pg_exec($connect, "DELETE FROM reseau WHERE idreseau = $idElement");
+                    }
                     break;
                 case 'interface':
-                    $sql = "DELETE FROM interface WHERE idinterface = $idElement 
-                            AND idequipement IN (SELECT idequipement FROM equipement WHERE idutilisateur = $idU)";
+                    pg_exec($connect, "DELETE FROM interface WHERE idinterface = $idElement AND idequipement IN (SELECT idequipement FROM equipement WHERE idutilisateur = $idU)");
                     break;
                 case 'route':
-                    $sql = "DELETE FROM route_statique WHERE idroute = $idElement 
-                            AND idequipement IN (SELECT idequipement FROM equipement WHERE idutilisateur = $idU)";
+                    pg_exec($connect, "DELETE FROM route_statique WHERE idroute = $idElement AND idequipement IN (SELECT idequipement FROM equipement WHERE idutilisateur = $idU)");
                     break;
                 default:
                     die("Erreur : Type d'élément invalide.");
             }
-            
-            pg_exec($connect, $sql) or die("Erreur lors de la suppression.");
             
             header("Location: ../index.php");
             exit();
@@ -580,14 +589,26 @@ if (isset($_POST['action'])) {
                                             FROM route_statique r 
                                             JOIN equipement e ON r.idequipement = e.idequipement 
                                             WHERE e.idutilisateur = $idU");
+            
+            // On regroupe d'abord les routes par équipement pour éviter qu'elles ne se superposent visuellement
+            $routesGroupees = [];
             while ($row = pg_fetch_array($resRoutes)) {
+                $idEq = $row['idequipement'];
+                if (!isset($routesGroupees[$idEq])) {
+                    $routesGroupees[$idEq] = [];
+                }
+                $routesGroupees[$idEq][] = '→ ' . $row['reseaudestination'] . ' via ' . $row['prochainsaut'];
+            }
+            
+            // Ensuite on crée une seule flèche par équipement avec les textes mis à la ligne
+            foreach ($routesGroupees as $idEq => $listeRoutes) {
                 $edges[] = [
-                    'from' => 'eq_' . $row['idequipement'],
-                    'to' => 'eq_' . $row['idequipement'],
-                    'label' => '→ ' . $row['reseaudestination'] . ' via ' . $row['prochainsaut'],
+                    'from' => 'eq_' . $idEq,
+                    'to' => 'eq_' . $idEq,
+                    'label' => implode("\n", $listeRoutes), // On fusionne les routes avec un saut de ligne
                     'dashes' => true,
                     'color' => '#9b59b6',
-                    'font' => ['size' => 9, 'color' => '#9b59b6']
+                    'font' => ['size' => 10, 'color' => '#9b59b6', 'align' => 'bottom']
                 ];
             }
 
