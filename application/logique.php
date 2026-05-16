@@ -132,6 +132,7 @@ function simulerUnSens($idSource, $idDest, $typeMessage, $etapeDepart) {
         'ip' => $ifaceSource['adresseip'],
         'reseau' => $ifaceSource['adressereseau'] . '/' . $ifaceSource['masquecidr'],
         'action' => "Préparation du datagramme IP ($typeMessage)",
+        'action' => "Préparation du datagramme IP ($typeMessage). Création de l'en-tête avec un TTL initial de $ttl et calcul du Checksum.",
         'ttl' => $ttl,
         'checksum' => calculerChecksum($ifaceSource['adresseip'], $ifaceDest['adresseip'], $ttl),
         'node_id' => 'eq_' . $idSource
@@ -167,6 +168,7 @@ function simulerUnSens($idSource, $idDest, $typeMessage, $etapeDepart) {
             'ip' => $ifaceDest['adresseip'],
             'reseau' => $ifaceDest['adressereseau'] . '/' . $ifaceDest['masquecidr'],
             'action' => "Réception du datagramme IP ($typeMessage)",
+            'action' => "Réception du datagramme IP ($typeMessage). Le PC lit le TTL ($ttl) sans le modifier et valide le Checksum.",
             'ttl' => $ttl,
             'checksum' => calculerChecksum($ifaceSource['adresseip'], $ifaceDest['adresseip'], $ttl),
             'node_id' => 'eq_' . $idDest
@@ -183,9 +185,22 @@ function simulerUnSens($idSource, $idDest, $typeMessage, $etapeDepart) {
 
     while ($sautActuel < $maxSauts) {
         $sautActuel++;
-        $ttl--;
         
-        // On interroge la table de routage statique pour trouver la passerelle
+        // RÈGLE 2 : Les réseaux directement connectés
+        // Est-ce que l'équipement courant est physiquement branché au réseau de destination ?
+        $sqlDirect = "SELECT idreseau FROM Interface WHERE idequipement = $eqCourantId AND idreseau = " . $ifaceDest['idreseau'] . " LIMIT 1";
+        $resDirect = pg_exec($connect, $sqlDirect);
+        
+        if (pg_num_rows($resDirect) > 0) {
+            $trouve = true;
+            $netCourantId = pg_fetch_array($resDirect)['idreseau'];
+            break; // Le routeur (ou PC) est directement connecté au bon réseau !
+        }
+        
+        // RÈGLE 1 & 3 : Le routage est nécessaire. Quel est le prochain saut ?
+        $prochainSaut = null;
+        
+        // On vérifie d'abord la table de routage statique (RÈGLE 3)
         $sqlRoute = "SELECT prochainsaut FROM Route_Statique 
                      WHERE idequipement = $eqCourantId 
                      AND (reseaudestination = '" . $ifaceDest['adressereseau'] . "' 
@@ -198,7 +213,25 @@ function simulerUnSens($idSource, $idDest, $typeMessage, $etapeDepart) {
         if (pg_num_rows($resRoute) > 0) {
             $route = pg_fetch_array($resRoute);
             $prochainSaut = $route['prochainsaut'];
+        } else {
+            // RÈGLE 1 : Si c'est un PC (Hôte), on utilise automatiquement le routeur de son réseau comme passerelle par défaut
+            $resType = pg_exec($connect, "SELECT typeequipement FROM Equipement WHERE idequipement = $eqCourantId");
+            $typeEq = pg_num_rows($resType) > 0 ? pg_fetch_array($resType)['typeequipement'] : 'Inconnu';
             
+            if ($typeEq == 'Hote') {
+                $sqlPasserelle = "SELECT i2.adresseip 
+                                  FROM Interface i1 
+                                  JOIN Interface i2 ON i1.idreseau = i2.idreseau 
+                                  JOIN Equipement e2 ON i2.idequipement = e2.idequipement 
+                                  WHERE i1.idequipement = $eqCourantId AND e2.typeequipement = 'Routeur' LIMIT 1";
+                $resPasserelle = pg_exec($connect, $sqlPasserelle);
+                if (pg_num_rows($resPasserelle) > 0) {
+                    $prochainSaut = pg_fetch_array($resPasserelle)['adresseip'];
+                }
+            }
+        }
+
+        if ($prochainSaut) {
             // On cherche le routeur cible grâce à l'IP du prochain saut
             $sqlRouteur = "SELECT e.idequipement, e.nomequipement, i.adressemac 
                            FROM Interface i 
@@ -209,7 +242,7 @@ function simulerUnSens($idSource, $idDest, $typeMessage, $etapeDepart) {
             if (pg_num_rows($resRouteur) > 0) {
                 $routeur = pg_fetch_array($resRouteur);
                 
-                // On identifie le réseau qui relie les deux routeurs pour l'animation graphique
+                // On identifie le réseau qui relie les deux équipements pour l'animation graphique
                 $sqlNet = "SELECT i1.idreseau FROM interface i1 JOIN interface i2 ON i1.idreseau = i2.idreseau WHERE i1.idequipement=$eqCourantId AND i2.idequipement=".$routeur['idequipement']." LIMIT 1";
                 $resNet = pg_exec($connect, $sqlNet);
                 $netCommun = pg_num_rows($resNet) > 0 ? pg_fetch_array($resNet)['idreseau'] : $netCourantId;
@@ -236,28 +269,27 @@ function simulerUnSens($idSource, $idDest, $typeMessage, $etapeDepart) {
                     'node_id' => 'eq_' . $routeur['idequipement']
                 ];
                 
+                // LE ROUTEUR RÉDUIT LE TTL ET RECALCULE LE CHECKSUM
+                $ttl--;
+                if ($ttl <= 0) {
+                    $chemin[] = ['erreur' => "Datagramme détruit par le routeur " . $routeur['nomequipement'] . " : TTL expiré (atteint 0)."];
+                    return $chemin;
+                }
+
                 $chemin[] = [
                     'etape' => $getEtape(),
                     'equipement' => 'Routeur: ' . $routeur['nomequipement'],
                     'ip' => $prochainSaut,
                     'reseau' => 'Passerelle',
                     'action' => 'Routage - TTL décrémenté, Checksum recalculé',
+                    'action' => "Routage - TTL décrémenté à $ttl, l'ancien Checksum est invalidé. Recalcul du nouveau Checksum IP avant transmission.",
                     'ttl' => $ttl,
                     'checksum' => calculerChecksum($ifaceSource['adresseip'], $ifaceDest['adresseip'], $ttl),
                     'node_id' => 'eq_' . $routeur['idequipement']
                 ];
                 
-                // Est-ce que ce nouveau routeur est directement branché au réseau final ?
-                $sqlDirect = "SELECT 1 FROM Interface WHERE idequipement = " . $routeur['idequipement'] . " AND idreseau = " . $ifaceDest['idreseau'];
-                $resDirect = pg_exec($connect, $sqlDirect);
-                
-                if (pg_num_rows($resDirect) > 0) {
-                    $trouve = true;
-                    $netCourantId = pg_fetch_array($resDirect)['idreseau'] ?? $ifaceDest['idreseau'];
-                    break;
-                } else {
-                    $eqCourantId = $routeur['idequipement'];
-                }
+                // On avance au saut suivant (le routeur qu'on vient d'atteindre)
+                $eqCourantId = $routeur['idequipement'];
             } else {
                 return array_merge($chemin, [['erreur' => "Erreur ARP: Impossible de joindre le prochain saut ($prochainSaut)."]]);
             }
@@ -340,6 +372,7 @@ function simulerUnSens($idSource, $idDest, $typeMessage, $etapeDepart) {
             'ip' => $ifaceDest['adresseip'],
             'reseau' => $ifaceDest['adressereseau'] . '/' . $ifaceDest['masquecidr'],
             'action' => "Paquet délivré avec succès ($typeMessage)",
+            'action' => "Paquet délivré avec succès ($typeMessage). L'hôte cible accepte le paquet, vérifie le Checksum et conserve le TTL tel quel ($ttl).",
             'ttl' => $ttl,
             'checksum' => calculerChecksum($ifaceSource['adresseip'], $ifaceDest['adresseip'], $ttl),
             'node_id' => 'eq_' . $idDest
