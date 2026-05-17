@@ -1,6 +1,8 @@
 <?php
 // =========================================================================
 // Projet Réseau - Fichier de Logique Métier (Backend)
+// Responsable : Ayyub BOUTAHIR
+// Rôle : Cœur du moteur réseau et logique métier
 // C'est ici que l'on traite les formulaires et qu'on exécute les algorithmes réseaux.
 // =========================================================================
 include_once("ConnectBDD.php");
@@ -9,13 +11,12 @@ include_once("ConnectBDD.php");
 // FONCTIONS UTILITAIRES (Sécurité et calculs IP)
 // =============================================================================
 
-// On sécurise systématiquement les saisies utilisateur pour éviter les injections SQL
+// Sécurisation basique des affichages (Les injections SQL sont gérées par PDO)
 function nettoyer($valeur) {
-    global $connect;
-    return pg_escape_string($connect, trim($valeur));
+    return trim(htmlspecialchars($valeur, ENT_QUOTES, 'UTF-8'));
 }
 
-// On vérifie que l'IP saisie ressemble bien à une vraie adresse IPv4
+// Validation du format IPv4
 function validerIP($ip) {
     return filter_var($ip, FILTER_VALIDATE_IP) !== false;
 }
@@ -33,7 +34,7 @@ function ipDansReseau($ip, $reseau, $cidr) {
     return calculerReseau($ip, $cidr) === $reseau;
 }
 
-// On simule le calcul du Checksum de l'en-tête IP (comme le ferait un vrai routeur)
+// Simulation du calcul du Checksum de l'en-tête IP (RFC 791)
 function calculerChecksum($source, $dest, $ttl) {
     $sum = 0;
     
@@ -62,11 +63,21 @@ function calculerChecksum($source, $dest, $ttl) {
 // MOTEUR DE SIMULATION IP (L'algorithme principal du projet)
 // =============================================================================
 
-// On orchestre la simulation complète : d'abord l'ALLER, puis le RETOUR.
+// Extraction des informations d'interface pour éviter la redondance (DRY)
+function getInterfaceInfo($idEq) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT i.adresseip, i.adressemac, i.idreseau, r.adressereseau, r.masquecidr, e.nomequipement 
+        FROM Interface i JOIN Reseau r ON i.idreseau = r.idreseau 
+        JOIN Equipement e ON i.idequipement = e.idequipement
+        WHERE i.idequipement = ? LIMIT 1");
+    $stmt->execute([$idEq]);
+    return $stmt->fetch();
+}
+
+// Orchestration de la simulation complète : ALLER puis RETOUR
 function tracerChemin($idSource, $idDest) {
     $aller = simulerUnSens($idSource, $idDest, 'ICMP Echo Request', 1);
     
-    // S'il y a une erreur sur l'aller (ex: route manquante), on s'arrête là
     $hasError = false;
     foreach ($aller as $etape) {
         if (isset($etape['erreur'])) {
@@ -125,13 +136,11 @@ function simulerUnSens($idSource, $idDest, $typeMessage, $etapeDepart) {
         return $etapeDepart + count($chemin);
     };
     
-    // ÉTAPE INITIALE : Création du paquet par la source
     $chemin[] = [
         'etape' => $getEtape(),
         'equipement' => 'Source: ' . $ifaceSource['nomequipement'],
         'ip' => $ifaceSource['adresseip'],
         'reseau' => $ifaceSource['adressereseau'] . '/' . $ifaceSource['masquecidr'],
-        'action' => "Préparation du datagramme IP ($typeMessage)",
         'action' => "Préparation du datagramme IP ($typeMessage). Création de l'en-tête avec un TTL initial de $ttl et calcul du Checksum.",
         'ttl' => $ttl,
         'checksum' => calculerChecksum($ifaceSource['adresseip'], $ifaceDest['adresseip'], $ttl),
@@ -167,7 +176,6 @@ function simulerUnSens($idSource, $idDest, $typeMessage, $etapeDepart) {
             'equipement' => 'Destination: ' . $ifaceDest['nomequipement'],
             'ip' => $ifaceDest['adresseip'],
             'reseau' => $ifaceDest['adressereseau'] . '/' . $ifaceDest['masquecidr'],
-            'action' => "Réception du datagramme IP ($typeMessage)",
             'action' => "Réception du datagramme IP ($typeMessage). Le PC lit le TTL ($ttl) sans le modifier et valide le Checksum.",
             'ttl' => $ttl,
             'checksum' => calculerChecksum($ifaceSource['adresseip'], $ifaceDest['adresseip'], $ttl),
@@ -281,7 +289,6 @@ function simulerUnSens($idSource, $idDest, $typeMessage, $etapeDepart) {
                     'equipement' => 'Routeur: ' . $routeur['nomequipement'],
                     'ip' => $prochainSaut,
                     'reseau' => 'Passerelle',
-                    'action' => 'Routage - TTL décrémenté, Checksum recalculé',
                     'action' => "Routage - TTL décrémenté à $ttl, l'ancien Checksum est invalidé. Recalcul du nouveau Checksum IP avant transmission.",
                     'ttl' => $ttl,
                     'checksum' => calculerChecksum($ifaceSource['adresseip'], $ifaceDest['adresseip'], $ttl),
@@ -295,15 +302,16 @@ function simulerUnSens($idSource, $idDest, $typeMessage, $etapeDepart) {
             }
         } else {
             // ERREUR CRITIQUE : Le routeur (ou le PC) ne sait pas où envoyer le paquet !
-            $resNom = pg_exec($connect, "SELECT nomequipement FROM Equipement WHERE idequipement = $eqCourantId");
-            $nomEq = pg_num_rows($resNom) > 0 ? pg_fetch_array($resNom)['nomequipement'] : "ID $eqCourantId";
+            $stmtNom = $pdo->prepare("SELECT nomequipement FROM Equipement WHERE idequipement = ?");
+            $stmtNom->execute([$eqCourantId]);
+            $nomEq = ($rowNom = $stmtNom->fetch()) ? $rowNom['nomequipement'] : "ID $eqCourantId";
             
             $chemin[] = ['erreur' => "Erreur de routage : L'équipement '$nomEq' ne trouve aucune route (passerelle) vers la destination."];
             
-            // Si c'est un routeur qui bloque, il renvoie gentiment un message d'erreur ICMP à la source
             if ($eqCourantId != $idSource) {
-                $resIpRouter = pg_exec($connect, "SELECT adresseip FROM Interface WHERE idequipement = $eqCourantId LIMIT 1");
-                $ipRouter = pg_num_rows($resIpRouter) > 0 ? pg_fetch_array($resIpRouter)['adresseip'] : 'Inconnue';
+                $stmtIpRouter = $pdo->prepare("SELECT adresseip FROM Interface WHERE idequipement = ? LIMIT 1");
+                $stmtIpRouter->execute([$eqCourantId]);
+                $ipRouter = ($rowIp = $stmtIpRouter->fetch()) ? $rowIp['adresseip'] : 'Inconnue';
                 
                 $chemin[] = [
                     'etape' => $getEtape(),
@@ -371,7 +379,6 @@ function simulerUnSens($idSource, $idDest, $typeMessage, $etapeDepart) {
             'equipement' => 'Destination: ' . $ifaceDest['nomequipement'],
             'ip' => $ifaceDest['adresseip'],
             'reseau' => $ifaceDest['adressereseau'] . '/' . $ifaceDest['masquecidr'],
-            'action' => "Paquet délivré avec succès ($typeMessage)",
             'action' => "Paquet délivré avec succès ($typeMessage). L'hôte cible accepte le paquet, vérifie le Checksum et conserve le TTL tel quel ($ttl).",
             'ttl' => $ttl,
             'checksum' => calculerChecksum($ifaceSource['adresseip'], $ifaceDest['adresseip'], $ttl),
@@ -388,8 +395,8 @@ function simulerUnSens($idSource, $idDest, $typeMessage, $etapeDepart) {
 // AIGUILLAGE DES FORMULAIRES (Méthodes POST)
 // =============================================================================
 
-if (isset($_POST['action'])) {
-    $action = $_POST['action'];
+if (isset($_REQUEST['action'])) {
+    $action = $_REQUEST['action'];
 
     switch ($action) {
         
@@ -398,12 +405,10 @@ if (isset($_POST['action'])) {
             $pseudo = nettoyer($_POST['pseudo']);
             $mdp = nettoyer($_POST['motDePasse']);
             
-            // Requête SQL avec protection contre les injections
-            $sql = "SELECT idutilisateur, pseudo FROM utilisateur WHERE pseudo='$pseudo' AND motdepasse='$mdp'";
-            $resultat = pg_exec($connect, $sql) or die("Erreur de connexion.");
+            $stmt = $pdo->prepare("SELECT idutilisateur, pseudo FROM utilisateur WHERE pseudo=? AND motdepasse=?");
+            $stmt->execute([$pseudo, $mdp]);
             
-            if (pg_num_rows($resultat) == 1) {
-                $user = pg_fetch_array($resultat);
+            if ($user = $stmt->fetch()) {
                 $_SESSION['idUtilisateur'] = $user['idutilisateur'];
                 $_SESSION['pseudo'] = $user['pseudo'];
             }
@@ -430,9 +435,8 @@ if (isset($_POST['action'])) {
                 die("Erreur : Adresse réseau invalide.");
             }
             
-            $sql = "INSERT INTO reseau (adressereseau, masquecidr, idutilisateur) 
-                    VALUES ('$adresseReseau', $masqueCIDR, " . $_SESSION['idUtilisateur'] . ")";
-            pg_exec($connect, $sql) or die("Erreur lors de l'insertion du réseau.");
+            $stmt = $pdo->prepare("INSERT INTO reseau (adressereseau, masquecidr, idutilisateur) VALUES (?, ?, ?)");
+            $stmt->execute([$adresseReseau, $masqueCIDR, $_SESSION['idUtilisateur']]);
             
             header("Location: ../index.php");
             exit();
@@ -446,9 +450,8 @@ if (isset($_POST['action'])) {
                 die("Erreur : Type d'équipement invalide.");
             }
             
-            $sql = "INSERT INTO equipement (nomequipement, typeequipement, idutilisateur) 
-                    VALUES ('$nomEquipement', '$typeEquipement', " . $_SESSION['idUtilisateur'] . ")";
-            pg_exec($connect, $sql) or die("Erreur lors de l'insertion de l'équipement.");
+            $stmt = $pdo->prepare("INSERT INTO equipement (nomequipement, typeequipement, idutilisateur) VALUES (?, ?, ?)");
+            $stmt->execute([$nomEquipement, $typeEquipement, $_SESSION['idUtilisateur']]);
             
             header("Location: ../index.php");
             exit();
@@ -465,8 +468,9 @@ if (isset($_POST['action'])) {
                 die("Erreur : Adresse IP invalide.");
             }
             
-            $resNet = pg_exec($connect, "SELECT adressereseau, masquecidr FROM reseau WHERE idreseau=$idReseau");
-            $netDB = pg_fetch_array($resNet);
+            $stmtNet = $pdo->prepare("SELECT adressereseau, masquecidr FROM reseau WHERE idreseau=?");
+            $stmtNet->execute([$idReseau]);
+            $netDB = $stmtNet->fetch();
             
             if ($masqueInterface != $netDB['masquecidr']) {
                 die("Erreur : Le masque saisi (/$masqueInterface) ne correspond pas au masque du réseau sélectionné (/" . $netDB['masquecidr'] . ").");
@@ -480,9 +484,8 @@ if (isset($_POST['action'])) {
                 die("Erreur : Adresse MAC invalide (format attendu: XX:XX:XX:XX:XX:XX).");
             }
             
-            $sql = "INSERT INTO interface (adresseip, adressemac, idequipement, idreseau) 
-                    VALUES ('$adresseIP', '$adresseMAC', $idEquipement, $idReseau)";
-            pg_exec($connect, $sql) or die("Erreur lors de l'insertion de l'interface.");
+            $stmt = $pdo->prepare("INSERT INTO interface (adresseip, adressemac, idequipement, idreseau) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$adresseIP, $adresseMAC, $idEquipement, $idReseau]);
             
             header("Location: ../index.php");
             exit();
@@ -494,12 +497,10 @@ if (isset($_POST['action'])) {
             $prochainSaut = nettoyer($_POST['prochainSaut']);
             $idEquipement = (int)$_POST['idEquipement'];
             
-            // On force l'adresse du réseau à être propre (ex: si on tape 192.168.2.10/24, on enregistre 192.168.2.0)
             $reseauPropre = calculerReseau($reseauDestination, $masqueCIDR);
             
-            $sql = "INSERT INTO route_statique (reseaudestination, prochainsaut, idequipement) 
-                    VALUES ('$reseauPropre', '$prochainSaut', $idEquipement)";
-            pg_exec($connect, $sql) or die("Erreur lors de l'insertion de la route.");
+            $stmt = $pdo->prepare("INSERT INTO route_statique (reseaudestination, prochainsaut, idequipement) VALUES (?, ?, ?)");
+            $stmt->execute([$reseauPropre, $prochainSaut, $idEquipement]);
             
             header("Location: ../index.php");
             exit();
@@ -510,32 +511,31 @@ if (isset($_POST['action'])) {
             $idElement = (int)$_POST['idElement'];
             $idU = (int)$_SESSION['idUtilisateur'];
             
-            // On gère la suppression en cascade manuellement pour respecter les clés étrangères de la BDD
             switch ($typeElement) {
                 case 'equipement':
-                    // On vérifie que l'équipement appartient bien à l'utilisateur
-                    $check = pg_exec($connect, "SELECT 1 FROM equipement WHERE idequipement = $idElement AND idutilisateur = $idU");
-                    if (pg_num_rows($check) > 0) {
-                        // On nettoie d'abord les dépendances (Routes puis Interfaces)
-                        pg_exec($connect, "DELETE FROM route_statique WHERE idequipement = $idElement");
-                        pg_exec($connect, "DELETE FROM interface WHERE idequipement = $idElement");
-                        // Puis on supprime l'équipement sereinement
-                        pg_exec($connect, "DELETE FROM equipement WHERE idequipement = $idElement");
+                    $stmt = $pdo->prepare("SELECT 1 FROM equipement WHERE idequipement = ? AND idutilisateur = ?");
+                    $stmt->execute([$idElement, $idU]);
+                    if ($stmt->fetch()) {
+                        $pdo->prepare("DELETE FROM route_statique WHERE idequipement = ?")->execute([$idElement]);
+                        $pdo->prepare("DELETE FROM interface WHERE idequipement = ?")->execute([$idElement]);
+                        $pdo->prepare("DELETE FROM equipement WHERE idequipement = ?")->execute([$idElement]);
                     }
                     break;
                 case 'reseau':
-                    $check = pg_exec($connect, "SELECT 1 FROM reseau WHERE idreseau = $idElement AND idutilisateur = $idU");
-                    if (pg_num_rows($check) > 0) {
-                        // On débranche les interfaces associées à ce réseau
-                        pg_exec($connect, "DELETE FROM interface WHERE idreseau = $idElement");
-                        pg_exec($connect, "DELETE FROM reseau WHERE idreseau = $idElement");
+                    $stmt = $pdo->prepare("SELECT 1 FROM reseau WHERE idreseau = ? AND idutilisateur = ?");
+                    $stmt->execute([$idElement, $idU]);
+                    if ($stmt->fetch()) {
+                        $pdo->prepare("DELETE FROM interface WHERE idreseau = ?")->execute([$idElement]);
+                        $pdo->prepare("DELETE FROM reseau WHERE idreseau = ?")->execute([$idElement]);
                     }
                     break;
                 case 'interface':
-                    pg_exec($connect, "DELETE FROM interface WHERE idinterface = $idElement AND idequipement IN (SELECT idequipement FROM equipement WHERE idutilisateur = $idU)");
+                    $stmt = $pdo->prepare("DELETE FROM interface WHERE idinterface = ? AND idequipement IN (SELECT idequipement FROM equipement WHERE idutilisateur = ?)");
+                    $stmt->execute([$idElement, $idU]);
                     break;
                 case 'route':
-                    pg_exec($connect, "DELETE FROM route_statique WHERE idroute = $idElement AND idequipement IN (SELECT idequipement FROM equipement WHERE idutilisateur = $idU)");
+                    $stmt = $pdo->prepare("DELETE FROM route_statique WHERE idroute = ? AND idequipement IN (SELECT idequipement FROM equipement WHERE idutilisateur = ?)");
+                    $stmt->execute([$idElement, $idU]);
                     break;
                 default:
                     die("Erreur : Type d'élément invalide.");
@@ -571,9 +571,9 @@ if (isset($_POST['action'])) {
             $nodes = [];
             $edges = [];
 
-            // 1. Les nuages de réseau
-            $resReseaux = pg_exec($connect, "SELECT idreseau, adressereseau, masquecidr FROM reseau WHERE idutilisateur=$idU");
-            while ($row = pg_fetch_array($resReseaux)) {
+            $stmtNet = $pdo->prepare("SELECT idreseau, adressereseau, masquecidr FROM reseau WHERE idutilisateur=?");
+            $stmtNet->execute([$idU]);
+            while ($row = $stmtNet->fetch()) {
                 $nodes[] = [
                     'id' => 'net_' . $row['idreseau'],
                     'label' => $row['adressereseau'] . '/' . $row['masquecidr'],
@@ -586,9 +586,9 @@ if (isset($_POST['action'])) {
                 ];
             }
 
-            // 2. Les équipements matériels (Routeurs et PC)
-            $resEq = pg_exec($connect, "SELECT idequipement, nomequipement, typeequipement FROM equipement WHERE idutilisateur=$idU");
-            while ($row = pg_fetch_array($resEq)) {
+            $stmtEq = $pdo->prepare("SELECT idequipement, nomequipement, typeequipement FROM equipement WHERE idutilisateur=?");
+            $stmtEq->execute([$idU]);
+            while ($row = $stmtEq->fetch()) {
                 $imagePath = ($row['typeequipement'] == 'Routeur') ? 'images/routeurv2.png' : 'images/hote.png';
                 
                 $nodes[] = [
@@ -602,12 +602,12 @@ if (isset($_POST['action'])) {
                 ];
             }
 
-            // 3. Les câbles (Liens physiques entre équipements et réseaux)
-            $resInt = pg_exec($connect, "SELECT i.idinterface, i.adresseip, i.idequipement, i.idreseau, e.nomequipement 
-                                          FROM interface i 
-                                          JOIN equipement e ON i.idequipement = e.idequipement 
-                                          WHERE e.idutilisateur = $idU");
-            while ($row = pg_fetch_array($resInt)) {
+            $stmtInt = $pdo->prepare("SELECT i.idinterface, i.adresseip, i.idequipement, i.idreseau, e.nomequipement 
+                                      FROM interface i 
+                                      JOIN equipement e ON i.idequipement = e.idequipement 
+                                      WHERE e.idutilisateur = ?");
+            $stmtInt->execute([$idU]);
+            while ($row = $stmtInt->fetch()) {
                 $edges[] = [
                     'from' => 'eq_' . $row['idequipement'],
                     'to' => 'net_' . $row['idreseau'],
@@ -617,15 +617,14 @@ if (isset($_POST['action'])) {
                 ];
             }
 
-            // 4. Représentation visuelle des routes statiques (Flèches pointillées)
-            $resRoutes = pg_exec($connect, "SELECT r.idroute, r.reseaudestination, r.prochainsaut, e.idequipement, e.nomequipement 
-                                            FROM route_statique r 
-                                            JOIN equipement e ON r.idequipement = e.idequipement 
-                                            WHERE e.idutilisateur = $idU");
+            $stmtRoutes = $pdo->prepare("SELECT r.idroute, r.reseaudestination, r.prochainsaut, e.idequipement, e.nomequipement 
+                                         FROM route_statique r 
+                                         JOIN equipement e ON r.idequipement = e.idequipement 
+                                         WHERE e.idutilisateur = ?");
+            $stmtRoutes->execute([$idU]);
             
-            // On regroupe d'abord les routes par équipement pour éviter qu'elles ne se superposent visuellement
             $routesGroupees = [];
-            while ($row = pg_fetch_array($resRoutes)) {
+            while ($row = $stmtRoutes->fetch()) {
                 $idEq = $row['idequipement'];
                 if (!isset($routesGroupees[$idEq])) {
                     $routesGroupees[$idEq] = [];
@@ -633,12 +632,11 @@ if (isset($_POST['action'])) {
                 $routesGroupees[$idEq][] = '→ ' . $row['reseaudestination'] . ' via ' . $row['prochainsaut'];
             }
             
-            // Ensuite on crée une seule flèche par équipement avec les textes mis à la ligne
             foreach ($routesGroupees as $idEq => $listeRoutes) {
                 $edges[] = [
                     'from' => 'eq_' . $idEq,
                     'to' => 'eq_' . $idEq,
-                    'label' => implode("\n", $listeRoutes), // On fusionne les routes avec un saut de ligne
+                    'label' => implode("\n", $listeRoutes),
                     'dashes' => true,
                     'color' => '#9b59b6',
                     'font' => ['size' => 10, 'color' => '#9b59b6', 'align' => 'bottom']
@@ -650,17 +648,17 @@ if (isset($_POST['action'])) {
 
         // --- API POUR LES DÉTAILS (Quand on clique sur un équipement) ---
         case 'get_node_details':
-            $nodeIdRaw = nettoyer($_POST['nodeId']); // ex: eq_1, net_2
+            $nodeIdRaw = nettoyer($_POST['nodeId']);
             $idU = (int)$_SESSION['idUtilisateur'];
             
             $data = ['success' => false];
             
-            // Si on a cliqué sur un équipement
             if (strpos($nodeIdRaw, 'eq_') === 0) {
                 $idEq = (int)str_replace('eq_', '', $nodeIdRaw);
                 
-                $resEq = pg_exec($connect, "SELECT * FROM equipement WHERE idequipement=$idEq AND idutilisateur=$idU");
-                if ($row = pg_fetch_array($resEq)) {
+                $stmtEq = $pdo->prepare("SELECT * FROM equipement WHERE idequipement=? AND idutilisateur=?");
+                $stmtEq->execute([$idEq, $idU]);
+                if ($row = $stmtEq->fetch()) {
                     $data['success'] = true;
                     $data['type'] = 'equipement';
                     $data['info'] = [
@@ -669,12 +667,12 @@ if (isset($_POST['action'])) {
                         'typeEq' => $row['typeequipement']
                     ];
                     
-                    $resInt = pg_exec($connect, "SELECT i.idinterface, i.adresseip, i.adressemac, r.adressereseau, r.masquecidr 
-                                                 FROM interface i 
-                                                 JOIN reseau r ON i.idreseau = r.idreseau 
-                                                 WHERE i.idequipement=$idEq");
+                    $stmtInt = $pdo->prepare("SELECT i.idinterface, i.adresseip, i.adressemac, r.adressereseau, r.masquecidr 
+                                              FROM interface i JOIN reseau r ON i.idreseau = r.idreseau 
+                                              WHERE i.idequipement=?");
+                    $stmtInt->execute([$idEq]);
                     $interfaces = [];
-                    while ($intRow = pg_fetch_array($resInt)) {
+                    while ($intRow = $stmtInt->fetch()) {
                         $interfaces[] = [
                             'id' => $intRow['idinterface'],
                             'ip' => $intRow['adresseip'],
@@ -684,9 +682,10 @@ if (isset($_POST['action'])) {
                     }
                     $data['interfaces'] = $interfaces;
                     
-                    $resRoute = pg_exec($connect, "SELECT idroute, reseaudestination, prochainsaut FROM route_statique WHERE idequipement=$idEq");
+                    $stmtRoute = $pdo->prepare("SELECT idroute, reseaudestination, prochainsaut FROM route_statique WHERE idequipement=?");
+                    $stmtRoute->execute([$idEq]);
                     $routes = [];
-                    while ($routeRow = pg_fetch_array($resRoute)) {
+                    while ($routeRow = $stmtRoute->fetch()) {
                         $routes[] = [
                             'id' => $routeRow['idroute'],
                             'dest' => $routeRow['reseaudestination'], 
@@ -695,20 +694,21 @@ if (isset($_POST['action'])) {
                     }
                     $data['routes'] = $routes;
                 }
-            // Si on a cliqué sur un nuage de réseau
             } elseif (strpos($nodeIdRaw, 'net_') === 0) {
                 $idNet = (int)str_replace('net_', '', $nodeIdRaw);
                 
-                $resNet = pg_exec($connect, "SELECT * FROM reseau WHERE idreseau=$idNet AND idutilisateur=$idU");
-                if ($row = pg_fetch_array($resNet)) {
+                $stmtNet = $pdo->prepare("SELECT * FROM reseau WHERE idreseau=? AND idutilisateur=?");
+                $stmtNet->execute([$idNet, $idU]);
+                if ($row = $stmtNet->fetch()) {
                     $data['success'] = true;
                     $data['type'] = 'reseau';
                     $data['info'] = ['id' => $row['idreseau'], 'reseau' => $row['adressereseau'] . '/' . $row['masquecidr']];
                     
-                    $resInt = pg_exec($connect, "SELECT i.idinterface, i.adresseip, i.adressemac, e.nomequipement, e.typeequipement 
-                                                 FROM interface i JOIN equipement e ON i.idequipement = e.idequipement WHERE i.idreseau=$idNet");
+                    $stmtInt = $pdo->prepare("SELECT i.idinterface, i.adresseip, i.adressemac, e.nomequipement, e.typeequipement 
+                                              FROM interface i JOIN equipement e ON i.idequipement = e.idequipement WHERE i.idreseau=?");
+                    $stmtInt->execute([$idNet]);
                     $interfaces = [];
-                    while ($intRow = pg_fetch_array($resInt)) {
+                    while ($intRow = $stmtInt->fetch()) {
                         $interfaces[] = [
                             'id' => $intRow['idinterface'],
                             'equipement' => $intRow['nomequipement'] . ' (' . $intRow['typeequipement'] . ')', 
@@ -726,6 +726,27 @@ if (isset($_POST['action'])) {
     }
 }
 
-// Redirection par défaut si aucune action reconnue
-header("Location: ../index.php");
-exit();
+// =============================================================================
+// MODÈLE DE DONNÉES POUR LA VUE (Séparation MVC)
+// =============================================================================
+
+function getEquipementsUtilisateur($idU) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT idequipement, nomequipement, typeequipement FROM Equipement WHERE idutilisateur=?");
+    $stmt->execute([$idU]);
+    return $stmt->fetchAll();
+}
+
+function getReseauxUtilisateur($idU) {
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT idreseau, adressereseau, masquecidr FROM Reseau WHERE idutilisateur=?");
+    $stmt->execute([$idU]);
+    return $stmt->fetchAll();
+}
+
+// Protection contre l'exécution directe si ce fichier est inclus comme modèle
+if (basename($_SERVER['PHP_SELF']) === 'logique.php') {
+    header("Location: ../index.php");
+    exit();
+}
+?>

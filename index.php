@@ -1,9 +1,11 @@
 <?php
 // =========================================================================
 // Projet Réseau - Interface Utilisateur (Vue principale)
+// Responsable : Abasse ALI
+// Rôle : Interface, ergonomie et intégration dynamique
 // Couche Présentation de l'architecture 3 tiers. Ne contient aucun traitement métier.
 // =========================================================================
-include_once("application/ConnectBDD.php");
+include_once("application/logique.php");
 $estConnecte = isset($_SESSION['idUtilisateur']);
 $simulationActive = isset($_SESSION['simulation']);
 ?>
@@ -55,21 +57,12 @@ $simulationActive = isset($_SESSION['simulation']);
                 </form>
             </header>
 
-            <!-- Optimisation : On pré-charge les données de la BDD une seule fois ici -->
-            <!-- Cela évite de refaire des requêtes SQL identiques pour chaque sous-menu -->
             <?php
             $idU = $_SESSION['idUtilisateur'];
-            
-            $resEq = pg_exec($connect, "SELECT idequipement, nomequipement, typeequipement FROM Equipement WHERE idutilisateur=$idU");
+            $equipementsBruts = getEquipementsUtilisateur($idU);
             $equipements = []; $hotes = [];
-            while($row = pg_fetch_array($resEq)) { 
-                $equipements[] = $row; 
-                if ($row['typeequipement'] == 'Hote') $hotes[] = $row;
-            }
-            
-            $resNet = pg_exec($connect, "SELECT idreseau, adressereseau, masquecidr FROM Reseau WHERE idutilisateur=$idU");
-            $reseaux = [];
-            while($row = pg_fetch_array($resNet)) { $reseaux[] = $row; }
+            foreach($equipementsBruts as $eq) { $equipements[] = $eq; if ($eq['typeequipement'] == 'Hote') $hotes[] = $eq; }
+            $reseaux = getReseauxUtilisateur($idU);
             ?>
 
             <!-- Barre d'outils principale (Boutons d'action) -->

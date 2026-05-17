@@ -1,8 +1,10 @@
 // =========================================================================
 // Projet Réseau - Script principal (Interface et Animation)
+// Responsable : Abasse ALI
+// Rôle : Interface, ergonomie et intégration dynamique
 // =========================================================================
 
-// 1. Fonction pour ouvrir/fermer joliment les sous-menus en haut de la page
+// Gestion de l'affichage des barres d'outils
 window.toggleToolbar = function(id) {
     document.querySelectorAll('.sub-toolbar').forEach(function(tb) {
         if (tb.id !== id) tb.classList.add('hidden');
@@ -14,7 +16,7 @@ window.toggleToolbar = function(id) {
 document.addEventListener("DOMContentLoaded", function() {
     var container = document.getElementById('mynetwork');
 
-    // On configure le moteur Vis.js (On désactive la physique pour que ça ressemble à Packet Tracer)
+    // Configuration du moteur Vis.js (physique désactivée pour mimiquer Packet Tracer)
     var options = {
         physics: { enabled: false },
         interaction: { dragNodes: true },
@@ -29,23 +31,22 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     };
 
-    // 2. On interroge notre serveur PHP pour récupérer les équipements créés
+    // Chargement asynchrone de la topologie réseau
     fetch('application/logique.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: 'action=get_topology'
     })
-    .then(response => response.text()) // On lit d'abord en texte brut pour voir s'il y a une erreur PHP
+    .then(response => response.text())
     .then(text => {
         try {
             var data = JSON.parse(text);
             
-            // On vérifie si le navigateur a déjà sauvegardé les positions de nos machines
+            // Restauration des coordonnées des équipements depuis le LocalStorage
             var savedPositions = JSON.parse(localStorage.getItem('topologyPositions')) || {};
             
             var positionsUpdated = false;
             
-            // On remet les machines à leur place, ou on fige les nouvelles
             data.nodes.forEach(function(node) {
                 if (savedPositions[node.id]) {
                     node.x = savedPositions[node.id].x;
@@ -60,7 +61,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 localStorage.setItem('topologyPositions', JSON.stringify(savedPositions));
             }
 
-            // On prépare les données pour Vis.js
             var nodesDataSet = new vis.DataSet(data.nodes);
             var edgesDataSet = new vis.DataSet(data.edges);
 
@@ -69,7 +69,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 edges: edgesDataSet
             }, options);
 
-            // Fonction maison pour empêcher les équipements de se superposer à l'écran
+            // Algorithme anti-chevauchement des nœuds (Collisions basiques)
             function applyAntiOverlap() {
                 var allPos = network.getPositions();
                 var minDistance = 110;
@@ -91,7 +91,6 @@ document.addEventListener("DOMContentLoaded", function() {
                             var angle = Math.atan2(dy, dx);
                             if (distance === 0) angle = Math.random() * Math.PI * 2;
                             
-                            // On les repousse doucement
                             var pushDist = (minDistance - distance) / 2 + 5;
                             pos1.x += Math.cos(angle) * pushDist;
                             pos1.y += Math.sin(angle) * pushDist;
@@ -107,7 +106,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 return changed;
             }
 
-            // On sauvegarde la position dans le navigateur
             function savePositions() {
                 var cleanPositions = {};
                 var currentPos = network.getPositions();
@@ -118,7 +116,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 localStorage.setItem('topologyPositions', JSON.stringify(cleanPositions));
             }
 
-            // Au démarrage : on écarte les éléments générés trop proches
+            // Application itérative de la physique au chargement
             var iterations = 0;
             var needsSave = false;
             while (applyAntiOverlap() && iterations < 10) {
@@ -127,13 +125,12 @@ document.addEventListener("DOMContentLoaded", function() {
             }
             if (needsSave) savePositions();
 
-            // Quand l'utilisateur a fini de glisser un équipement
             network.on("dragEnd", function (params) {
                 applyAntiOverlap();
                 savePositions();
             });
 
-            // 3. Quand on clique sur un équipement : Affichage des détails en bas à droite
+            // Requête asynchrone des métadonnées du nœud sélectionné
             network.on("click", function(params) {
                 var detailsPanel = document.getElementById('node-details-panel');
                 var contentDiv = document.getElementById('nd-content');
@@ -210,7 +207,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 }
             });
 
-            // Fermeture de la petite fenêtre
             var closeBtn = document.getElementById('nd-close');
             if (closeBtn) {
                 closeBtn.addEventListener('click', function() {
@@ -222,7 +218,6 @@ document.addEventListener("DOMContentLoaded", function() {
             // ANIMATION DE LA SIMULATION IP (TEMPS RÉEL)
             // =========================================================================
             if (typeof window.simulationData !== 'undefined' && window.simulationData.length > 0) {
-                // On crée notre petite enveloppe cachée
                 nodesDataSet.add({
                     id: 'sim_packet',
                     shape: 'image',
@@ -244,7 +239,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     let step = window.simulationData[stepIndex];
                     
                     if (step.erreur) {
-                        // Si erreur, on remplace l'enveloppe par une croix rouge vectorielle (SVG)
+                        // Remplacement visuel par une erreur SVG
                         var errorSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="60" height="60">' +
                                        '<rect x="8" y="16" width="48" height="32" fill="#f1c40f" stroke="#e67e22" stroke-width="4"/>' +
                                        '<polyline points="8,16 32,36 56,16" fill="none" stroke="#e67e22" stroke-width="4"/>' +
@@ -254,7 +249,6 @@ document.addEventListener("DOMContentLoaded", function() {
                         var url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(errorSvg);
                         nodesDataSet.update({id: packetNodeId, image: url, size: 30});
 
-                        // Surligner la ligne de la console en rouge
                         let liElements = document.querySelectorAll('.sim-step-item');
                         if (liElements[stepIndex]) {
                             liElements[stepIndex].style.display = 'block';
@@ -266,7 +260,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
                         setTimeout(() => {
                             if (stepIndex + 1 < window.simulationData.length) {
-                                // On transforme en message ICMP rouge pour le retour
+                                // Transformation du paquet en datagramme d'erreur ICMP pour le flux de retour
                                 var icmpSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="60" height="60"><rect x="8" y="16" width="48" height="32" fill="#e74c3c" stroke="#c0392b" stroke-width="4"/><polyline points="8,16 32,36 56,16" fill="none" stroke="#c0392b" stroke-width="4"/></svg>';
                                 var icmpUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(icmpSvg);
                                 nodesDataSet.update({id: packetNodeId, image: icmpUrl, size: 20});
@@ -285,7 +279,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
                     let targetPos = network.getPositions([targetNodeId])[targetNodeId];
 
-                    // Surligner la bonne ligne dans la console (en bleu)
+                    // Scroll et mise en avant dans la console
                     let liElements = document.querySelectorAll('.sim-step-item');
                     if (liElements[stepIndex]) {
                         liElements[stepIndex].style.display = 'block';
@@ -301,7 +295,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         let currentPos = network.getPositions([packetNodeId])[packetNodeId];
                         
                         if (Math.abs(currentPos.x - targetPos.x) < 1 && Math.abs(currentPos.y - targetPos.y) < 1) {
-                            // Effet de "Pulse" si on reste sur le même équipement (ex: ARP Local)
+                            // Effet visuel "Pulse" lors de processus locaux sur le même nœud (ex: ARP)
                             nodesDataSet.update({id: packetNodeId, size: 30});
                             setTimeout(() => { nodesDataSet.update({id: packetNodeId, size: 20}); stepIndex++; animateStep(); }, 800);
                         } else {
@@ -310,7 +304,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     }
                 }
 
-                // Petite fonction mathématique pour rendre le mouvement fluide (Easing)
+                // Équation d'easing (Ease-In-Out) pour la translation des paquets
                 function animateMove(from, to, duration, callback) {
                     let start = null;
                     function stepAnim(timestamp) {
