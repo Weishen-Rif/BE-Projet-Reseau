@@ -1,6 +1,4 @@
 ## Simulateur Réseau TCP/IP
-=======
-## Simulateur Réseau TCP/IP
 
 Bienvenue sur le dépôt du **Simulateur Réseau TCP/IP**. Ce projet est une application Web interactive permettant de modéliser des topologies réseau, de configurer l'adressage IP et le routage statique, et de simuler visuellement l'acheminement de datagrammes à travers le réseau (façon *Cisco Packet Tracer*).
 
