@@ -23,8 +23,7 @@ try {
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
     ]);
-} catch (PDOException $e) {
-    error_log($e->getMessage());
-    die("Erreur fatale : Impossible de se connecter à la base de données PostgreSQL.");
+} } catch (PDOException $e) {
+    die("Erreur fatale PDO : " . $e->getMessage());
 }
 ?>
