@@ -18,8 +18,7 @@ $user = getenv('DB_USER') ?: "postgres";
 $password = getenv('DB_PASS') ?: "postgres"; 
 
 try {
-    $endpointId = explode('.', $host)[0]; 
-    $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=require;options=project%3D$endpointId";
+    $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=require";
     $pdo = new PDO($dsn, $user, $password, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
