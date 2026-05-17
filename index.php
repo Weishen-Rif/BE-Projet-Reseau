@@ -75,12 +75,27 @@ $simulationActive = isset($_SESSION['simulation']);
             <!-- Barre d'outils principale (Boutons d'action) -->
             <div class="top-toolbars">
                 <div class="main-toolbar">
-                    <button class="tb-btn" onclick="toggleToolbar('tb-reseau')">☁️ Créer un réseau</button>
-                    <button class="tb-btn" onclick="toggleToolbar('tb-equipement')">💻 Ajouter un équipement</button>
-                    <button class="tb-btn" onclick="toggleToolbar('tb-interface')">🔌 Configurer une interface</button>
-                    <button class="tb-btn" onclick="toggleToolbar('tb-route')">↔️​ Configurer une route statique</button>
+                    <button class="tb-btn" onclick="toggleToolbar('tb-reseau')">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+                        Créer un réseau
+                    </button>
+                    <button class="tb-btn" onclick="toggleToolbar('tb-equipement')">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="2" y1="20" x2="22" y2="20"></line></svg>
+                        Ajouter un équipement
+                    </button>
+                    <button class="tb-btn" onclick="toggleToolbar('tb-interface')">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/></svg>
+                        Configurer une interface
+                    </button>
+                    <button class="tb-btn" onclick="toggleToolbar('tb-route')">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 8 16 13"></polyline><line x1="21" y1="8" x2="9" y2="8"></line><polyline points="8 21 3 16 8 11"></polyline><line x1="3" y1="16" x2="15" y2="16"></line></svg>
+                        Configurer une route statique
+                    </button>
                     <div style="flex-grow:1;"></div> <!-- Espaceur -->
-                    <button style="color:white;" class="tb-btn btn-danger" onclick="toggleToolbar('tb-supprimer')">🗑️ Supprimer</button>
+                    <button style="color:white;" class="tb-btn btn-danger" onclick="toggleToolbar('tb-supprimer')">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        Supprimer
+                    </button>
                 </div>
 
                 <!-- Formulaires cachés (Ils s'affichent en cliquant sur la barre d'outils) -->
