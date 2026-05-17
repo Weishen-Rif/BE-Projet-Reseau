@@ -24,7 +24,7 @@ try {
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
     ]);
-} } catch (PDOException $e) {
+} catch (PDOException $e) {
     die("Erreur fatale PDO : " . $e->getMessage());
 }
 ?>
