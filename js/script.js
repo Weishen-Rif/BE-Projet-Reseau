@@ -27,7 +27,8 @@ document.addEventListener("DOMContentLoaded", function() {
         edges: {
             arrows: { to: { enabled: false } },
             color: '#2c3e50',
-            font: { size: 10, align: 'middle' }
+            font: { size: 10, align: 'middle' },
+            smooth: false // <-- Lignes parfaitement droites (Désactive les courbes)
         }
     };
 
@@ -42,25 +43,7 @@ document.addEventListener("DOMContentLoaded", function() {
         try {
             var data = JSON.parse(text);
             
-            // Restauration des coordonnées des équipements depuis le LocalStorage
-            var savedPositions = JSON.parse(localStorage.getItem('topologyPositions')) || {};
-            
-            var positionsUpdated = false;
-            
-            data.nodes.forEach(function(node) {
-                if (savedPositions[node.id]) {
-                    node.x = savedPositions[node.id].x;
-                    node.y = savedPositions[node.id].y;
-                } else {
-                    savedPositions[node.id] = { x: node.x, y: node.y };
-                    positionsUpdated = true;
-                }
-            });
-            
-            if (positionsUpdated) {
-                localStorage.setItem('topologyPositions', JSON.stringify(savedPositions));
-            }
-
+            // Création directe des nœuds (Vis.js intègre nativement x et y s'ils sont dans le JSON)
             var nodesDataSet = new vis.DataSet(data.nodes);
             var edgesDataSet = new vis.DataSet(data.edges);
 
@@ -69,65 +52,23 @@ document.addEventListener("DOMContentLoaded", function() {
                 edges: edgesDataSet
             }, options);
 
-            // Algorithme anti-chevauchement des nœuds (Collisions basiques)
-            function applyAntiOverlap() {
-                var allPos = network.getPositions();
-                var minDistance = 110;
-                var changed = false;
-                var nodeIds = Object.keys(allPos);
-                
-                for (var i = 0; i < nodeIds.length; i++) {
-                    for (var j = i + 1; j < nodeIds.length; j++) {
-                        var id1 = nodeIds[i];
-                        var id2 = nodeIds[j];
-                        var pos1 = allPos[id1];
-                        var pos2 = allPos[id2];
-                        
-                        var dx = pos1.x - pos2.x;
-                        var dy = pos1.y - pos2.y;
-                        var distance = Math.sqrt(dx * dx + dy * dy);
-                        
-                        if (distance < minDistance) {
-                            var angle = Math.atan2(dy, dx);
-                            if (distance === 0) angle = Math.random() * Math.PI * 2;
-                            
-                            var pushDist = (minDistance - distance) / 2 + 5;
-                            pos1.x += Math.cos(angle) * pushDist;
-                            pos1.y += Math.sin(angle) * pushDist;
-                            pos2.x -= Math.cos(angle) * pushDist;
-                            pos2.y -= Math.sin(angle) * pushDist;
-                            
-                            network.moveNode(id1, pos1.x, pos1.y);
-                            network.moveNode(id2, pos2.x, pos2.y);
-                            changed = true;
-                        }
-                    }
-                }
-                return changed;
-            }
-
-            function savePositions() {
-                var cleanPositions = {};
-                var currentPos = network.getPositions();
-                for (var k in currentPos) {
-                    if (k === 'sim_packet') continue;
-                    cleanPositions[k] = { x: currentPos[k].x, y: currentPos[k].y };
-                }
-                localStorage.setItem('topologyPositions', JSON.stringify(cleanPositions));
-            }
-
-            // Application itérative de la physique au chargement
-            var iterations = 0;
-            var needsSave = false;
-            while (applyAntiOverlap() && iterations < 10) {
-                iterations++;
-                needsSave = true;
-            }
-            if (needsSave) savePositions();
-
+            // Envoi des nouvelles coordonnées strictes à la BDD
             network.on("dragEnd", function (params) {
-                applyAntiOverlap();
-                savePositions();
+                if (params.nodes.length > 0) {
+                    var nodeId = params.nodes[0];
+                    var newPos = network.getPositions([nodeId])[nodeId];
+                    
+                    var formData = new URLSearchParams();
+                    formData.append('nodeId', nodeId);
+                    formData.append('x', newPos.x);
+                    formData.append('y', newPos.y);
+
+                    fetch('application/update_coords.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData.toString()
+                    }).catch(err => console.error('Erreur sauvegarde BDD :', err));
+                }
             });
 
             // Requête asynchrone des métadonnées du nœud sélectionné

@@ -8,14 +8,18 @@ CREATE TABLE IF NOT EXISTS reseau (
     idreseau SERIAL PRIMARY KEY,
     adressereseau VARCHAR(18) NOT NULL,
     masquecidr SMALLINT NOT NULL CHECK (masquecidr BETWEEN 1 AND 32),
-    idutilisateur INTEGER NOT NULL REFERENCES utilisateur(idutilisateur) ON DELETE CASCADE
+    idutilisateur INTEGER NOT NULL REFERENCES utilisateur(idutilisateur) ON DELETE CASCADE,
+    x FLOAT,
+    y FLOAT
 );
 
 CREATE TABLE IF NOT EXISTS equipement (
     idequipement SERIAL PRIMARY KEY,
     nomequipement VARCHAR(100) NOT NULL,
     typeequipement VARCHAR(20) NOT NULL CHECK (typeequipement IN ('Routeur', 'Hote')),
-    idutilisateur INTEGER NOT NULL REFERENCES utilisateur(idutilisateur) ON DELETE CASCADE
+    idutilisateur INTEGER NOT NULL REFERENCES utilisateur(idutilisateur) ON DELETE CASCADE,
+    x FLOAT,
+    y FLOAT
 );
 
 CREATE TABLE IF NOT EXISTS interface (

@@ -546,7 +546,7 @@ if (isset($_REQUEST['action'])) {
             $nodes = [];
             $edges = [];
 
-            $stmtNet = $pdo->prepare("SELECT idreseau, adressereseau, masquecidr FROM reseau WHERE idutilisateur=?");
+            $stmtNet = $pdo->prepare("SELECT idreseau, adressereseau, masquecidr, x, y FROM reseau WHERE idutilisateur=?");
             $stmtNet->execute([$idU]);
             while ($row = $stmtNet->fetch()) {
                 $nodes[] = [
@@ -556,12 +556,12 @@ if (isset($_REQUEST['action'])) {
                     'image' => 'images/reseauv2.png',
                     'size' => 70,
                     'font' => ['size' => 13, 'color' => '#000000', 'vadjust' => -80, 'strokeWidth' => 0, 'bold' => true],
-                    'x' => rand(-200, 200),
-                    'y' => rand(-200, 200)
+                    'x' => $row['x'] !== null ? (float)$row['x'] : rand(-200, 200),
+                    'y' => $row['y'] !== null ? (float)$row['y'] : rand(-200, 200)
                 ];
             }
 
-            $stmtEq = $pdo->prepare("SELECT idequipement, nomequipement, typeequipement FROM equipement WHERE idutilisateur=?");
+            $stmtEq = $pdo->prepare("SELECT idequipement, nomequipement, typeequipement, x, y FROM equipement WHERE idutilisateur=?");
             $stmtEq->execute([$idU]);
             while ($row = $stmtEq->fetch()) {
                 $imagePath = ($row['typeequipement'] == 'Routeur') ? 'images/routeurv2.png' : 'images/hote.png';
@@ -572,8 +572,8 @@ if (isset($_REQUEST['action'])) {
                     'shape' => 'image',
                     'image' => $imagePath,
                     'font' => ['size' => 12, 'color' => '#333', 'background' => 'rgba(255, 255, 255, 0.8)'],
-                    'x' => rand(-200, 200),
-                    'y' => rand(-200, 200)
+                    'x' => $row['x'] !== null ? (float)$row['x'] : rand(-200, 200),
+                    'y' => $row['y'] !== null ? (float)$row['y'] : rand(-200, 200)
                 ];
             }
 

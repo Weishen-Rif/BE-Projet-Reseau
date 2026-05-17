@@ -2,12 +2,12 @@
 -- PostgreSQL database dump
 --
 
-\restrict vFk0drIXGj4jvtlsSGJ9CrXQ4JKZR58oXmn0FpPJki6ylu4io4lMu6ggduvhqx2
+\restrict IXuc92HiSabox9lwt9DUwyimVKkj4JOl5yjC85OSrYidykVelQ2I819JPzjD14A
 
 -- Dumped from database version 18.2
 -- Dumped by pg_dump version 18.1
 
--- Started on 2026-05-17 18:27:57
+-- Started on 2026-05-17 21:27:25
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -34,7 +34,9 @@ CREATE TABLE public.equipement (
     idequipement integer NOT NULL,
     nomequipement character varying(50) NOT NULL,
     typeequipement character varying(50) NOT NULL,
-    idutilisateur integer NOT NULL
+    idutilisateur integer NOT NULL,
+    x double precision,
+    y double precision
 );
 
 
@@ -215,7 +217,9 @@ CREATE TABLE public.reseau (
     idreseau integer NOT NULL,
     adressereseau character varying(15) NOT NULL,
     masquecidr integer NOT NULL,
-    idutilisateur integer NOT NULL
+    idutilisateur integer NOT NULL,
+    x double precision,
+    y double precision
 );
 
 
@@ -387,13 +391,13 @@ ALTER TABLE ONLY public.utilisateur ALTER COLUMN idutilisateur SET DEFAULT nextv
 -- Data for Name: equipement; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.equipement (idequipement, nomequipement, typeequipement, idutilisateur) FROM stdin;
-5	Routeur 1	Routeur	1
-7	PC Ayyub	Hote	1
-9	PC Robin	Hote	1
-10	Routeur 2	Routeur	1
-11	PC Meud	Hote	1
-13	Routeur 3	Routeur	1
+COPY public.equipement (idequipement, nomequipement, typeequipement, idutilisateur, x, y) FROM stdin;
+11	PC Meud	Hote	1	380	207
+5	Routeur 1	Routeur	1	-624	21
+10	Routeur 2	Routeur	1	-325	-231
+7	PC Ayyub	Hote	1	-873	-273
+9	PC Robin	Hote	1	10	-438
+13	Routeur 3	Routeur	1	59	31
 \.
 
 
@@ -452,11 +456,11 @@ COPY public.position_equipement (idequipement, posx, posy) FROM stdin;
 -- Data for Name: reseau; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.reseau (idreseau, adressereseau, masquecidr, idutilisateur) FROM stdin;
-2	192.168.1.0	24	1
-5	192.168.2.0	24	1
-6	192.168.3.0	24	1
-8	192.168.5.0	24	1
+COPY public.reseau (idreseau, adressereseau, masquecidr, idutilisateur, x, y) FROM stdin;
+8	192.168.5.0	24	1	379	8
+5	192.168.2.0	24	1	-333	29
+2	192.168.1.0	24	1	-618	-255
+6	192.168.3.0	24	1	11	-220
 \.
 
 
@@ -474,6 +478,8 @@ COPY public.route_statique (idroute, reseaudestination, prochainsaut, idequipeme
 12	192.168.5.0	192.168.2.252	10
 13	192.168.3.0	192.168.2.253	13
 14	0.0.0.0	192.168.5.254	11
+16	0.0.0.0	192.168.2.252	5
+17	0.0.0.0	192.168.2.254	13
 \.
 
 
@@ -539,7 +545,7 @@ SELECT pg_catalog.setval('public.reseau_idreseau_seq', 10, true);
 -- Name: route_statique_idroute_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.route_statique_idroute_seq', 14, true);
+SELECT pg_catalog.setval('public.route_statique_idroute_seq', 17, true);
 
 
 --
@@ -713,11 +719,11 @@ ALTER TABLE ONLY public.position_equipement
     ADD CONSTRAINT position_equipement_idequipement_fkey FOREIGN KEY (idequipement) REFERENCES public.equipement(idequipement) ON DELETE CASCADE;
 
 
--- Completed on 2026-05-17 18:27:58
+-- Completed on 2026-05-17 21:27:25
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vFk0drIXGj4jvtlsSGJ9CrXQ4JKZR58oXmn0FpPJki6ylu4io4lMu6ggduvhqx2
+\unrestrict IXuc92HiSabox9lwt9DUwyimVKkj4JOl5yjC85OSrYidykVelQ2I819JPzjD14A
 
