@@ -1,14 +1,10 @@
-<<<<<<< HEAD
-﻿## Simulateur Réseau TCP/IP
-=======
 ## Simulateur Réseau TCP/IP
->>>>>>> a6af359c88f7a3863c26f57bfda0b2a3b899feeb
 
 Bienvenue sur le dépôt du **Simulateur Réseau TCP/IP**. Ce projet est une application Web interactive permettant de modéliser des topologies réseau, de configurer l'adressage IP et le routage statique, et de simuler visuellement l'acheminement de datagrammes à travers le réseau (façon *Cisco Packet Tracer*).
 
 Ce projet a été réalisé dans le cadre d'un cursus universitaire (Licence 3 IRT).
 
-- Tester l'application en ligne : [Insérez le lien du site]
+- Tester l'application en ligne : https://untimely-uncertain-arrest.ngrok-free.dev/projet_reseau/
 - Consulter le dépôt GitHub : https://github.com/Weishen-Rif/BE-Projet-Reseau
 
 ---
