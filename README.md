@@ -20,7 +20,7 @@ Ce projet a été réalisé dans le cadre d'un cursus universitaire (Licence 3 I
 
 ---
 
-## Architecture du Projet (3 Tiers)
+## Architecture du Projet
 
 Le projet respecte strictement une architecture logicielle en 3 Tiers, sans utilisation de frameworks lourds pour la logique backend, afin de démontrer la maîtrise des concepts fondamentaux :
 
