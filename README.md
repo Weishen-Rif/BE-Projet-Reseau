@@ -49,7 +49,7 @@ Le projet respecte strictement une architecture logicielle en 3 Tiers, sans util
 1. Clonez ce dépôt dans le répertoire web de votre serveur local (ex: `C:\laragon\www\projet_reseau_gemini`).
 2. Créez une base de données PostgreSQL nommée `simulation_reseau`.
 3. Importez le schéma SQL (modèle de données) dans cette base.
-4. Importez `donnees_test.sql` pour charger directement notre jeu de données d'évaluation (incluant un compte préconfiguré et une topologie complète à 3 routeurs et 2 hôtes prêts à l'emploi)
+4. Importez `donnees_test.sql` pour charger directement notre jeu de données d'évaluation (incluant un compte préconfiguré et une topologie complète à 3 routeurs et 3 hôtes prêts à l'emploi)
 .
 5. Ouvrez le fichier `application/ConnectBDD.php` et vérifiez que les identifiants de connexion correspondent à votre installation locale :
    ```php
