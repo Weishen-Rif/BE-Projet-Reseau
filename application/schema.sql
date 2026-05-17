@@ -1,4 +1,17 @@
-﻿CREATE TABLE IF NOT EXISTS utilisateur (
+-- ==============================================================================
+-- STRUCTURE DE LA BASE DE DONNÉES - SIMULATEUR RÉSEAU TCP/IP
+-- ==============================================================================
+-- Ce script initialise le schéma relationnel vierge de l'application.
+-- Il génère les 5 entités principales, strictement normalisées en 3FN, 
+-- garantissant l'intégrité et le cloisonnement des données par utilisateur.
+--
+-- Utilisation : Exécutez ce script dans PostgreSQL pour préparer l'environnement 
+-- de travail vierge avant le premier lancement du simulateur.
+--
+-- Développé par : Abasse ALI, Robin RIGAL et Ayyub BOUTAHIR.
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS utilisateur (
     idutilisateur SERIAL PRIMARY KEY,
     pseudo VARCHAR(50) NOT NULL UNIQUE,
     motdepasse VARCHAR(255) NOT NULL
