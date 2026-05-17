@@ -1,4 +1,16 @@
 <?php
+/* ==============================================================================
+ * FICHIER ANNEXE : GESTION DES COORDONNÉES DYNAMIQUES
+ * ==============================================================================
+ * Ce fichier annexe a été spécialement ajouté pour gérer la sauvegarde en temps 
+ * réel des coordonnées (x, y) des éléments de la topologie sur le canevas Vis.js.
+ * 
+ * Il réceptionne les requêtes asynchrones (Fetch/AJAX) générées lors du déplacement 
+ * physique d'un nœud par l'utilisateur, et met à jour sa position exacte dans la 
+ * base de données PostgreSQL via des requêtes PDO sécurisées.
+ * 
+ * Développé par : Abasse ALI, Robin RIGAL et Ayyub BOUTAHIR.
+ * ============================================================================== */
 include_once("ConnectBDD.php");
 
 if (isset($_POST['nodeId'], $_POST['x'], $_POST['y']) && isset($_SESSION['idUtilisateur'])) {
