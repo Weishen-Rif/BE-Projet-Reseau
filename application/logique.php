@@ -99,31 +99,17 @@ function tracerChemin($idSource, $idDest) {
 
 // On simule un trajet dans un seul sens (saut par saut)
 function simulerUnSens($idSource, $idDest, $typeMessage, $etapeDepart) {
-    global $connect;
+    global $pdo;
     
     $chemin = [];
     
-    // 1. On récupère les infos de l'interface de départ
-    $sql = "SELECT i.adresseip, i.adressemac, i.idreseau, r.adressereseau, r.masquecidr, e.nomequipement 
-            FROM Interface i 
-            JOIN Reseau r ON i.idreseau = r.idreseau 
-            JOIN Equipement e ON i.idequipement = e.idequipement
-            WHERE i.idequipement = $idSource LIMIT 1";
-    $res = pg_exec($connect, $sql) or die("Erreur récupération interface source.");
-    $ifaceSource = pg_fetch_array($res);
+    $ifaceSource = getInterfaceInfo($idSource);
     
     if (!$ifaceSource) {
         return [['erreur' => 'L\'équipement source n\'a pas d\'interface configurée.']];
     }
     
-    // 2. On récupère les infos de l'interface d'arrivée
-    $sql = "SELECT i.adresseip, i.adressemac, i.idreseau, r.adressereseau, r.masquecidr, e.nomequipement 
-            FROM Interface i 
-            JOIN Reseau r ON i.idreseau = r.idreseau 
-            JOIN Equipement e ON i.idequipement = e.idequipement
-            WHERE i.idequipement = $idDest LIMIT 1";
-    $res = pg_exec($connect, $sql) or die("Erreur récupération interface destination.");
-    $ifaceDest = pg_fetch_array($res);
+    $ifaceDest = getInterfaceInfo($idDest);
     
     if (!$ifaceDest) {
         return [['erreur' => 'L\'équipement destination n\'a pas d\'interface configurée.']];
@@ -196,12 +182,12 @@ function simulerUnSens($idSource, $idDest, $typeMessage, $etapeDepart) {
         
         // RÈGLE 2 : Les réseaux directement connectés
         // Est-ce que l'équipement courant est physiquement branché au réseau de destination ?
-        $sqlDirect = "SELECT idreseau FROM Interface WHERE idequipement = $eqCourantId AND idreseau = " . $ifaceDest['idreseau'] . " LIMIT 1";
-        $resDirect = pg_exec($connect, $sqlDirect);
+        $stmtDirect = $pdo->prepare("SELECT idreseau FROM Interface WHERE idequipement = ? AND idreseau = ? LIMIT 1");
+        $stmtDirect->execute([$eqCourantId, $ifaceDest['idreseau']]);
         
-        if (pg_num_rows($resDirect) > 0) {
+        if ($rowDirect = $stmtDirect->fetch()) {
             $trouve = true;
-            $netCourantId = pg_fetch_array($resDirect)['idreseau'];
+            $netCourantId = $rowDirect['idreseau'];
             break; // Le routeur (ou PC) est directement connecté au bon réseau !
         }
         
@@ -209,51 +195,40 @@ function simulerUnSens($idSource, $idDest, $typeMessage, $etapeDepart) {
         $prochainSaut = null;
         
         // On vérifie d'abord la table de routage statique (RÈGLE 3)
-        $sqlRoute = "SELECT prochainsaut FROM Route_Statique 
-                     WHERE idequipement = $eqCourantId 
-                     AND (reseaudestination = '" . $ifaceDest['adressereseau'] . "' 
-                       OR reseaudestination = '" . $ifaceDest['adressereseau'] . "/" . $ifaceDest['masquecidr'] . "'
-                       OR reseaudestination = '0.0.0.0' 
-                       OR reseaudestination = '0.0.0.0/0')
-                     ORDER BY reseaudestination DESC LIMIT 1";
-        $resRoute = pg_exec($connect, $sqlRoute);
+        $stmtRoute = $pdo->prepare("SELECT prochainsaut FROM Route_Statique 
+                     WHERE idequipement = ? 
+                     AND reseaudestination IN (?, ?, '0.0.0.0', '0.0.0.0/0')
+                     ORDER BY reseaudestination DESC LIMIT 1");
+        $stmtRoute->execute([$eqCourantId, $ifaceDest['adressereseau'], $ifaceDest['adressereseau'] . '/' . $ifaceDest['masquecidr']]);
         
-        if (pg_num_rows($resRoute) > 0) {
-            $route = pg_fetch_array($resRoute);
+        if ($route = $stmtRoute->fetch()) {
             $prochainSaut = $route['prochainsaut'];
         } else {
             // RÈGLE 1 : Si c'est un PC (Hôte), on utilise automatiquement le routeur de son réseau comme passerelle par défaut
-            $resType = pg_exec($connect, "SELECT typeequipement FROM Equipement WHERE idequipement = $eqCourantId");
-            $typeEq = pg_num_rows($resType) > 0 ? pg_fetch_array($resType)['typeequipement'] : 'Inconnu';
+            $stmtType = $pdo->prepare("SELECT typeequipement FROM Equipement WHERE idequipement = ?");
+            $stmtType->execute([$eqCourantId]);
+            $typeEq = ($rowType = $stmtType->fetch()) ? $rowType['typeequipement'] : 'Inconnu';
             
             if ($typeEq == 'Hote') {
-                $sqlPasserelle = "SELECT i2.adresseip 
-                                  FROM Interface i1 
-                                  JOIN Interface i2 ON i1.idreseau = i2.idreseau 
-                                  JOIN Equipement e2 ON i2.idequipement = e2.idequipement 
-                                  WHERE i1.idequipement = $eqCourantId AND e2.typeequipement = 'Routeur' LIMIT 1";
-                $resPasserelle = pg_exec($connect, $sqlPasserelle);
-                if (pg_num_rows($resPasserelle) > 0) {
-                    $prochainSaut = pg_fetch_array($resPasserelle)['adresseip'];
+                $stmtPasserelle = $pdo->prepare("SELECT i2.adresseip FROM Interface i1 JOIN Interface i2 ON i1.idreseau = i2.idreseau JOIN Equipement e2 ON i2.idequipement = e2.idequipement WHERE i1.idequipement = ? AND e2.typeequipement = 'Routeur' LIMIT 1");
+                $stmtPasserelle->execute([$eqCourantId]);
+                if ($rowPass = $stmtPasserelle->fetch()) {
+                    $prochainSaut = $rowPass['adresseip'];
                 }
             }
         }
 
         if ($prochainSaut) {
             // On cherche le routeur cible grâce à l'IP du prochain saut
-            $sqlRouteur = "SELECT e.idequipement, e.nomequipement, i.adressemac 
-                           FROM Interface i 
-                           JOIN Equipement e ON i.idequipement = e.idequipement 
-                           WHERE i.adresseip = '$prochainSaut' LIMIT 1";
-            $resRouteur = pg_exec($connect, $sqlRouteur);
+            $stmtRouteur = $pdo->prepare("SELECT e.idequipement, e.nomequipement, i.adressemac FROM Interface i JOIN Equipement e ON i.idequipement = e.idequipement WHERE i.adresseip = ? LIMIT 1");
+            $stmtRouteur->execute([$prochainSaut]);
             
-            if (pg_num_rows($resRouteur) > 0) {
-                $routeur = pg_fetch_array($resRouteur);
+            if ($routeur = $stmtRouteur->fetch()) {
                 
                 // On identifie le réseau qui relie les deux équipements pour l'animation graphique
-                $sqlNet = "SELECT i1.idreseau FROM interface i1 JOIN interface i2 ON i1.idreseau = i2.idreseau WHERE i1.idequipement=$eqCourantId AND i2.idequipement=".$routeur['idequipement']." LIMIT 1";
-                $resNet = pg_exec($connect, $sqlNet);
-                $netCommun = pg_num_rows($resNet) > 0 ? pg_fetch_array($resNet)['idreseau'] : $netCourantId;
+                $stmtNet = $pdo->prepare("SELECT i1.idreseau FROM interface i1 JOIN interface i2 ON i1.idreseau = i2.idreseau WHERE i1.idequipement=? AND i2.idequipement=? LIMIT 1");
+                $stmtNet->execute([$eqCourantId, $routeur['idequipement']]);
+                $netCommun = ($rowNet = $stmtNet->fetch()) ? $rowNet['idreseau'] : $netCourantId;
                 
                 $chemin[] = [
                     'etape' => $getEtape(),

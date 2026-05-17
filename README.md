@@ -1,8 +1,11 @@
-﻿# Simulateur Réseau TCP/IP
+﻿## Simulateur Réseau TCP/IP
 
 Bienvenue sur le dépôt du **Simulateur Réseau TCP/IP**. Ce projet est une application Web interactive permettant de modéliser des topologies réseau, de configurer l'adressage IP et le routage statique, et de simuler visuellement l'acheminement de datagrammes à travers le réseau (façon *Cisco Packet Tracer*).
 
-Ce projet a été réalisé dans le cadre d'un cursus universitaire (Licence 3 Informatique).
+Ce projet a été réalisé dans le cadre d'un cursus universitaire (Licence 3 IRT).
+
+- Tester l'application en ligne : [Insérez le lien du site]
+- Consulter le dépôt GitHub : https://github.com/Weishen-Rif/BE-Projet-Reseau
 
 ---
 
@@ -20,7 +23,7 @@ Ce projet a été réalisé dans le cadre d'un cursus universitaire (Licence 3 I
 
 ---
 
-## Architecture du Projet (3 Tiers)
+## Architecture du Projet
 
 Le projet respecte strictement une architecture logicielle en 3 Tiers, sans utilisation de frameworks lourds pour la logique backend, afin de démontrer la maîtrise des concepts fondamentaux :
 
@@ -49,7 +52,9 @@ Le projet respecte strictement une architecture logicielle en 3 Tiers, sans util
 1. Clonez ce dépôt dans le répertoire web de votre serveur local (ex: `C:\laragon\www\projet_reseau_gemini`).
 2. Créez une base de données PostgreSQL nommée `simulation_reseau`.
 3. Importez le schéma SQL (modèle de données) dans cette base.
-4. Ouvrez le fichier `application/ConnectBDD.php` et vérifiez que les identifiants de connexion correspondent à votre installation locale :
+4. Importez `donnees_test.sql` pour charger directement notre jeu de données d'évaluation (incluant un compte préconfiguré et une topologie complète à 3 routeurs et 3 hôtes prêts à l'emploi)
+.
+5. Ouvrez le fichier `application/ConnectBDD.php` et vérifiez que les identifiants de connexion correspondent à votre installation locale :
    ```php
    $host = "localhost";
    $port = "5432";
@@ -57,18 +62,30 @@ Le projet respecte strictement une architecture logicielle en 3 Tiers, sans util
    $user = "postgres";
    $password = "votre_mot_de_passe"; 
    ```
-5. Accédez au projet via votre navigateur à l'adresse : `http://localhost/projet_reseau_gemini`
+6. Accédez au projet via votre navigateur à l'adresse : `http://localhost/projet_reseau_gemini`
 
 ---
 
-## Mode d'emploi rapide (Scénario de test)
+## Mode d'emploi rapide
 
-1. Connectez-vous avec vos identifiants.
-2. **Créer des réseaux** : Dans la barre d'outils, créez deux réseaux distincts (ex: `192.168.1.0/24` et `192.168.2.0/24`).
-3. **Ajouter le matériel** : Ajoutez deux Hôtes (PC 1, PC 2) et un Routeur.
-4. **Câbler (Interfaces)** : Connectez PC 1 au réseau 1, PC 2 au réseau 2, et donnez au Routeur une interface dans chaque réseau (ex: `192.168.1.254` et `192.168.2.254`).
-5. **Routage** : Ajoutez une route par défaut (`0.0.0.0/0`) sur PC 1 pointant vers `192.168.1.254`, et une sur PC 2 pointant vers `192.168.2.254`.
-6. **Simulation** : Dans la console à droite, lancez un datagramme IP de PC 1 vers PC 2 et observez la magie du routage opérer !
+
+
+
+
+> **⚠️ Note à l'évaluateur :** Les étapes ci-dessous sont destinées au cas où vous avez démarré avec un espace de travail vierge (via `base_de_donnees.sql`). Si vous avez importé le fichier `donnees_test.sql` lors de l'installation, cette topologie est déjà entièrement construite et routée. Vous pouvez alors vous connecter et passer directement à l'étape 6 "Simulation" !
+
+1. **Connexion** : Connectez-vous avec vos identifiants. (Par défaut : `admin` | `admin123`).
+2. **Créer des réseaux** : Dans la barre d'outils, créez trois réseaux distincts pour permettre un routage multi-sauts : un réseau source (`192.168.3.0/24`), un réseau de transit (`192.168.2.0/24`) et un réseau de destination (`192.168.5.0/24`).
+3. **Ajouter le matériel** : Ajoutez deux Hôtes (PC 1, PC 2) et deux Routeurs (Routeur 1, Routeur 2).
+4. **Câbler (Interfaces)** : 
+   - Connectez PC 1 au réseau source (ex: `192.168.3.1`).
+   - Connectez PC 2 au réseau de destination (ex: `192.168.5.1`).
+   - Connectez le Routeur 1 au réseau source (interface `192.168.3.254`) et au réseau de transit (interface `192.168.2.253`).
+   - Connectez le Routeur 2 au réseau de transit (interface `192.168.2.252`) et au réseau de destination (interface `192.168.5.254`).
+5. **Routage** : 
+   - **Sur les PC :** Ajoutez une route par défaut (`0.0.0.0/0`) sur PC 1 pointant vers sa passerelle `192.168.3.254`, et une sur PC 2 pointant vers `192.168.5.254`.
+   - **Sur les Routeurs :** Sur le Routeur 1, ajoutez une route vers le réseau `192.168.5.0/24` via le prochain saut `192.168.2.252` (Routeur 2). Sur le Routeur 2, ajoutez une route vers le réseau `192.168.3.0/24` via le prochain saut `192.168.2.253` (Routeur 1).
+6. **Simulation** : Dans la console à droite, lancez un datagramme IP de PC 1 vers PC 2. Vous pourrez observer la cinématique complète : les résolutions ARP, la double décrémentation du TTL et le recalcul du Checksum IP à chaque passage de routeur !
 
 ---
 
