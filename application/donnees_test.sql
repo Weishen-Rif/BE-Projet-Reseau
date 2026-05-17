@@ -1,13 +1,21 @@
+-- ==============================================================================
+-- JEU DE DONNÉES DE TEST - SIMULATEUR RÉSEAU TCP/IP
+-- ==============================================================================
+-- Ce script précharge un environnement complet pour tester le simulateur 
+-- instantanément, sans devoir configurer le réseau de zéro.
 --
--- PostgreSQL database dump
+-- À noter : Ces données ont été créées organiquement via l'interface Web 
+-- de l'application, puis exportées automatiquement avec pgAdmin.
 --
-
-\restrict IXuc92HiSabox9lwt9DUwyimVKkj4JOl5yjC85OSrYidykVelQ2I819JPzjD14A
-
--- Dumped from database version 18.2
--- Dumped by pg_dump version 18.1
-
--- Started on 2026-05-17 21:27:25
+-- Ce fichier contient :
+-- 1. Un compte utilisateur préconfiguré.
+-- 2. Une topologie prête à l'emploi (4 réseaux, 3 routeurs, PC Robin, PC Meud et PC Ayyub).
+--
+-- Utilisation : Importez ce script dans votre base de données, connectez-vous, 
+-- et lancez directement un "Ping" pour voir l'acheminement en action !
+--
+-- Développé par : Abasse ALI, Robin RIGAL et Ayyub BOUTAHIR.
+-- ==============================================================================
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -718,12 +726,4 @@ ALTER TABLE ONLY public.lien_reseau
 ALTER TABLE ONLY public.position_equipement
     ADD CONSTRAINT position_equipement_idequipement_fkey FOREIGN KEY (idequipement) REFERENCES public.equipement(idequipement) ON DELETE CASCADE;
 
-
--- Completed on 2026-05-17 21:27:25
-
---
--- PostgreSQL database dump complete
---
-
-\unrestrict IXuc92HiSabox9lwt9DUwyimVKkj4JOl5yjC85OSrYidykVelQ2I819JPzjD14A
 
