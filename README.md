@@ -1,5 +1,4 @@
-<<<<<<< HEAD
-﻿## Simulateur Réseau TCP/IP
+## Simulateur Réseau TCP/IP
 =======
 ## Simulateur Réseau TCP/IP
 
