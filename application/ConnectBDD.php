@@ -11,11 +11,11 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$host = "localhost";
-$port = "5432";
-$dbname = "simulation_reseau";
-$user = "postgres";
-$password = "postgres"; 
+$host = getenv('DB_HOST') ?: "localhost";
+$port = getenv('DB_PORT') ?: "5432";
+$dbname = getenv('DB_NAME') ?: "simulation_reseau";
+$user = getenv('DB_USER') ?: "postgres";
+$password = getenv('DB_PASS') ?: "postgres"; 
 
 try {
     $dsn = "pgsql:host=$host;port=$port;dbname=$dbname";
